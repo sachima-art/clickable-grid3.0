@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>可點擊的方格網格</title>
+    <!-- 載入 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 設定字體為 Inter */
+        html { font-family: 'Inter', sans-serif; }
+
+        /* 確保網格項目有邊框且等高 */
+        .grid-cell {
+            aspect-ratio: 1 / 1; /* 保持方格為正方形 */
+            transition: background-color 0.15s ease, transform 0.05s ease;
+            border: 1px solid #e5e7eb; /* 淺灰色邊框 */
+            cursor: pointer;
+        }
+        .grid-cell:hover {
+            box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); /* 懸停時的藍色陰影 */
+            z-index: 10;
+        }
+
+        /* 隱藏原生邊框重疊時的雙邊框效果，使網格看起來更連續 */
+        #grid-container {
+            border-collapse: collapse;
+            line-height: 0; /* 移除行高影響 */
+        }
+    </style>
+    <script>
+        // 擴展 Tailwind 配置以允許 grid-cols-10, 20, 30
+        tailwind.config = {
+            theme: {
+                extend: {
+                    gridTemplateColumns: {
+                        '10': 'repeat(10, minmax(0, 1fr))',
+                        '20': 'repeat(20, minmax(0, 1fr))',
+                        '30': 'repeat(30, minmax(0, 1fr))',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <!-- 主容器，尺寸會在 JS 中動態調整 -->
+    <div id="main-card" class="w-full bg-white p-6 rounded-xl shadow-2xl transition-all duration-300">
+        <h1 class="text-3xl font-bold text-center text-blue-700 mb-2">20x20 可點擊方格</h1>
+        <p class="text-center text-gray-500 mb-6">點擊方格以填滿顏色，再次點擊以清除。</p>
+
+        <!-- 尺寸選擇按鈕 -->
+        <div class="mb-6 flex flex-wrap justify-center space-x-2 sm:space-x-4">
+            <button data-size="10" class="size-button px-4 py-2 bg-gray-200 text-gray-800 rounded-lg shadow hover:bg-blue-300 transition duration-150 ease-in-out">10x10</button>
+            <button data-size="20" class="size-button px-4 py-2 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600 transition duration-150 ease-in-out">20x20</button>
+            <button data-size="30" class="size-button px-4 py-2 bg-gray-200 text-gray-800 rounded-lg shadow hover:bg-blue-600 transition duration-150 ease-in-out">30x30</button>
+        </div>
+        
+        <!-- 已填滿格子數量顯示框 -->
+        <div class="mt-4 mb-6 p-3 bg-blue-100 rounded-lg shadow-inner text-center">
+            <p class="text-lg font-semibold text-blue-800">已填滿格子數量：<span id="filled-count" class="text-2xl font-bold">0</span></p>
+        </div>
+
+        <!-- 網格容器 -->
+        <div id="grid-container" class="grid w-full mx-auto border border-gray-300 rounded-lg overflow-hidden shadow-lg">
+            <!-- 方格將由 JavaScript 動態生成 -->
+        </div>
+        
+        <div class="mt-6 flex justify-center">
+            <button id="clear-button" class="px-6 py-2 bg-red-500 text-white font-semibold rounded-lg shadow-md hover:bg-red-600 transition duration-150 ease-in-out">
+                清除所有顏色
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 初始化變數
+        let currentGridSize = 20; 
+        const gridContainer = document.getElementById('grid-container');
+        const clearButton = document.getElementById('clear-button');
+        const mainCard = document.getElementById('main-card');
+        
+        // 顏色和懸停類別常數
+        const FILLED_CLASS = 'bg-blue-500';
+        const EMPTY_CLASS = 'bg-white'; 
+        const HOVER_CLASS = 'hover:bg-blue-100'; // 定義懸停類別
+
+        // 計數相關變數
+        let filledCellCount = 0;
+        let filledCountElement; 
+
+        /**
+         * 更新已填滿格子數量的顯示
+         */
+        function updateFilledCountDisplay() {
+            if (filledCountElement) {
+                filledCountElement.textContent = filledCellCount;
+            }
+        }
+
+        /**
+         * 處理方格點擊事件，切換顏色
+         * @param {Event} event - 點擊事件物件
+         */
+        function handleCellClick(event) {
+            const cell = event.currentTarget;
+            // 檢查方格是否已經填滿藍色
+            const isFilled = cell.classList.contains(FILLED_CLASS);
+
+            if (isFilled) {
+                // 如果已填滿，則清除顏色 (移除藍色，恢復白色)
+                cell.classList.remove(FILLED_CLASS); 
+                cell.classList.add(EMPTY_CLASS);
+                cell.classList.add(HOVER_CLASS); // 恢復懸停效果
+                filledCellCount--; // 減少計數
+            } else {
+                // 如果未填滿，則填滿顏色 (新增藍色，移除白色)
+                cell.classList.add(FILLED_CLASS);
+                cell.classList.remove(EMPTY_CLASS);
+                cell.classList.remove(HOVER_CLASS); // 移除懸停效果，確保顏色固定為深藍
+                filledCellCount++; // 增加計數
+            }
+            // 更新顯示計數
+            updateFilledCountDisplay(); 
+        }
+
+        /**
+         * 更新網格容器和主卡片的 Tailwind CSS 類別
+         * @param {number} size - 網格的新尺寸 (e.g., 10, 20, 30)
+         */
+        function updateGridClass(size) {
+            // 移除舊的 grid-cols-* 類別
+            gridContainer.classList.remove(`grid-cols-${currentGridSize}`);
+            
+            // 新增新的 grid-cols-* 類別
+            gridContainer.classList.add(`grid-cols-${size}`);
+
+            // 調整主容器 (main-card) 的最大寬度以適應網格大小
+            const maxWClasses = ['max-w-lg', 'max-w-2xl', 'max-w-4xl'];
+            mainCard.classList.remove(...maxWClasses);
+
+            if (size === 10) {
+                mainCard.classList.add('max-w-lg');
+            } else if (size === 20) {
+                mainCard.classList.add('max-w-2xl');
+            } else if (size === 30) {
+                // 30x30 需要更大的空間
+                mainCard.classList.add('max-w-4xl');
+            }
+        }
+
+        /**
+         * 動態生成網格並附加事件監聽器
+         * @param {number} size - 網格的邊長 (e.g., 10, 20, 30)
+         */
+        function createGrid(size) {
+            // 清除舊的網格內容
+            gridContainer.innerHTML = '';
+            
+            for (let i = 0; i < size * size; i++) {
+                const cell = document.createElement('div');
+                // 初始狀態：包含白色背景和懸停效果
+                cell.className = `grid-cell ${EMPTY_CLASS} ${HOVER_CLASS}`;
+                cell.id = `cell-${i}`;
+                cell.addEventListener('click', handleCellClick);
+                gridContainer.appendChild(cell);
+            }
+            
+            // 更新尺寸和相關樣式
+            currentGridSize = size;
+            updateGridClass(size);
+        }
+
+        /**
+         * 清除所有方格的顏色
+         */
+        function clearAllCells() {
+            // 獲取所有已填色的方格
+            const filledCells = gridContainer.querySelectorAll(`.${FILLED_CLASS}`);
+            
+            // 移除每個方格的填色類別，並確保恢復為白色和懸停效果
+            filledCells.forEach(cell => {
+                cell.classList.remove(FILLED_CLASS);
+                cell.classList.add(EMPTY_CLASS); 
+                cell.classList.add(HOVER_CLASS); // 確保清除後恢復懸停效果
+            });
+
+            // 重置計數並更新顯示
+            filledCellCount = 0;
+            updateFilledCountDisplay();
+
+            // 顯示清除成功的訊息 (使用 DOM 替代 alert)
+            const messageBox = document.createElement('div');
+            messageBox.textContent = '所有顏色已清除！';
+            messageBox.className = 'absolute top-5 right-5 p-3 bg-green-500 text-white rounded-lg shadow-xl animate-pulse z-50';
+            document.body.appendChild(messageBox);
+            
+            // 2 秒後移除訊息框
+            setTimeout(() => {
+                messageBox.remove();
+            }, 2000);
+        }
+        
+        /**
+         * 設置新的網格尺寸並重新繪製網格
+         * @param {number} newSize - 新的網格尺寸
+         */
+        function setGridSize(newSize) {
+            // 確保點擊的不是當前尺寸
+            if (newSize === currentGridSize) return;
+            
+            // 重置計數，因為網格完全重新創建
+            filledCellCount = 0;
+            updateFilledCountDisplay(); 
+
+            // 重新建立網格
+            createGrid(newSize);
+
+            // 更新按鈕樣式：突出顯示當前選定的尺寸
+            document.querySelectorAll('.size-button').forEach(btn => {
+                const size = parseInt(btn.getAttribute('data-size'));
+                const isSelected = size === newSize;
+
+                // 移除所有按鈕的選定/未選定樣式
+                btn.classList.remove('bg-blue-500', 'text-white', 'bg-gray-200', 'text-gray-800');
+
+                if (isSelected) {
+                    // 應用選定樣式
+                    btn.classList.add('bg-blue-500', 'text-white', 'hover:bg-blue-600');
+                } else {
+                    // 應用未選定樣式
+                    btn.classList.add('bg-gray-200', 'text-gray-800', 'hover:bg-blue-300');
+                }
+            });
+
+            // 更新標題
+            document.querySelector('h1').textContent = `${newSize}x${newSize} 可點擊方格`;
+        }
+
+
+        // 頁面載入完成後執行
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化計數顯示元素
+            filledCountElement = document.getElementById('filled-count'); 
+            
+            // 初始化網格為 20x20
+            setGridSize(currentGridSize);
+            clearButton.addEventListener('click', clearAllCells);
+
+            // 設置尺寸按鈕的事件監聽器
+            document.querySelectorAll('.size-button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const newSize = parseInt(e.currentTarget.getAttribute('data-size'));
+                    setGridSize(newSize);
+                });
+            });
+        });
+
+    </script>
+</body>
+</html>
